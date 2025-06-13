@@ -45,6 +45,9 @@ python -m bot.main
 - `/add_sub <user_id> <duracion>` da de alta a un usuario manualmente.
 - `/remove_sub <user_id>` da de baja a un usuario.
 - `/list_subs` lista los usuarios activos con su fecha de entrada.
+- `/set_rate <dias> <monto>` define la tarifa y periodo de cobro.
+- `/broadcast <mensaje>` envía un mensaje a todos los suscriptores.
+- `/gen_link <user_id> <duracion>` genera un enlace con token para un usuario.
 
 ### Comandos de usuario
 

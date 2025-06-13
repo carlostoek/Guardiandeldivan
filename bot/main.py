@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -17,6 +17,9 @@ from .database import (
     remove_subscription,
     subscription_expired,
     list_active_subscriptions,
+    set_setting,
+    get_setting,
+    get_all_subscriptions,
     DB_NAME,
 )
 from .token_manager import generate_token
@@ -126,13 +129,70 @@ async def list_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 @admin_only
+async def set_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 2:
+        await update.effective_message.reply_text("Uso: /set_rate <dias> <monto>")
+        return
+    try:
+        days = int(context.args[0])
+        amount = float(context.args[1])
+    except ValueError:
+        await update.effective_message.reply_text("Valores invalidos")
+        return
+    set_setting("rate_frequency", str(days))
+    set_setting("rate_amount", str(amount))
+    await update.effective_message.reply_text(
+        f"Tarifa guardada: cada {days} dias por {amount}"
+    )
+
+
+@admin_only
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.effective_message.reply_text("Uso: /broadcast <mensaje>")
+        return
+    message = " ".join(context.args)
+    sent = 0
+    for sub in list_active_subscriptions():
+        try:
+            await context.bot.send_message(sub["user_id"], message)
+            sent += 1
+        except Exception as exc:
+            logger.error("Error enviando a %s: %s", sub["user_id"], exc)
+    await update.effective_message.reply_text(f"Mensaje enviado a {sent} usuarios")
+
+
+@admin_only
+async def gen_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) != 2:
+        await update.effective_message.reply_text(
+            "Uso: /gen_link <user_id> <duracion>"
+        )
+        return
+    try:
+        user_id = int(context.args[0])
+    except ValueError:
+        await update.effective_message.reply_text("user_id debe ser numerico")
+        return
+    key = context.args[1]
+    token, days = generate_token(key)
+    add_subscription(user_id, token, days)
+    bot_username = (await context.bot.get_me()).username
+    link = f"https://t.me/{bot_username}?start={token}"
+    await update.effective_message.reply_text(f"Enlace de acceso: {link}")
+
+
+@admin_only
 async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(
         "Comandos admin:\n"
         "/gen_token <duracion> - Generar token para un usuario\n"
         "/add_sub <user_id> <duracion> - Alta manual\n"
         "/remove_sub <user_id> - Baja manual\n"
-        "/list_subs - Listar suscriptores activos"
+        "/list_subs - Listar suscriptores activos\n"
+        "/set_rate <dias> <monto> - Configurar tarifa\n"
+        "/broadcast <mensaje> - Enviar mensaje a todos\n"
+        "/gen_link <user_id> <duracion> - Generar link con token"
     )
 
 
@@ -172,9 +232,76 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "stats":
         await stats(update, context)
     elif data == "configuracion":
-        await query.message.reply_text("Menú de configuración en desarrollo")
+        keyboard = [
+            [InlineKeyboardButton("Configurar tarifa", callback_data="set_tarifa")],
+            [InlineKeyboardButton("Volver", callback_data="volver")],
+        ]
+        await query.message.reply_text(
+            "Menú de configuración:", reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif data == "set_tarifa":
+        await query.message.reply_text("Uso: /set_rate <dias> <monto>")
     elif data == "administracion":
-        await query.message.reply_text("Menú de administración en desarrollo")
+        keyboard = [
+            [InlineKeyboardButton("Estadísticas", callback_data="admin_stats")],
+            [InlineKeyboardButton("Enviar broadcast", callback_data="admin_broadcast")],
+            [InlineKeyboardButton("Generar link", callback_data="admin_gen_link")],
+            [InlineKeyboardButton("Suscriptores", callback_data="admin_subs")],
+            [InlineKeyboardButton("Volver", callback_data="volver")],
+        ]
+        await query.message.reply_text(
+            "Menú de administración:", reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif data == "admin_stats":
+        await stats(update, context)
+    elif data == "admin_broadcast":
+        await query.message.reply_text("Uso: /broadcast <mensaje>")
+    elif data == "admin_gen_link":
+        await query.message.reply_text("Uso: /gen_link <user_id> <duracion>")
+    elif data == "admin_subs":
+        subs = list_active_subscriptions()
+        if not subs:
+            await query.message.reply_text("No hay suscriptores activos")
+        else:
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        str(s["user_id"]), callback_data=f"sub_{s['user_id']}"
+                    )
+                ]
+                for s in subs
+            ]
+            keyboard.append([InlineKeyboardButton("Volver", callback_data="administracion")])
+            await query.message.reply_text(
+                "Suscriptores:", reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+    elif data.startswith("sub_"):
+        user_id = int(data.split("_")[1])
+        sub = get_subscription(user_id)
+        if not sub:
+            await query.message.reply_text("Suscriptor no encontrado")
+        else:
+            end_date = sub["start_date"] + timedelta(days=sub["duration"])
+            tiempo = datetime.utcnow() - sub["start_date"]
+            text = (
+                f"ID: {user_id}\n"
+                f"Ingreso: {sub['start_date'].strftime('%Y-%m-%d')}\n"
+                f"Término: {end_date.strftime('%Y-%m-%d')}\n"
+                f"Tiempo en canal: {tiempo.days} días\n"
+                f"Renovaciones: {sub['renewals']}"
+            )
+            keyboard = [
+                [InlineKeyboardButton("Expulsar", callback_data=f"expulsar_{user_id}")],
+                [InlineKeyboardButton("Volver", callback_data="admin_subs")],
+            ]
+            await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    elif data.startswith("expulsar_"):
+        user_id = int(data.split("_")[1])
+        await context.bot.ban_chat_member(CHANNEL_ID, user_id)
+        remove_subscription(user_id)
+        await query.message.reply_text("Usuario expulsado")
+    elif data == "volver":
+        await show_main_menu(update, context)
     elif data == "list_subs":
         await list_subs(update, context)
     elif data == "gen_token":
@@ -221,6 +348,9 @@ def main() -> None:
     application.add_handler(CommandHandler("add_sub", add_sub))
     application.add_handler(CommandHandler("remove_sub", remove_sub))
     application.add_handler(CommandHandler("list_subs", list_subs))
+    application.add_handler(CommandHandler("set_rate", set_rate))
+    application.add_handler(CommandHandler("broadcast", broadcast))
+    application.add_handler(CommandHandler("gen_link", gen_link))
     application.add_handler(CommandHandler("admin", admin_help))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("menu", menu))

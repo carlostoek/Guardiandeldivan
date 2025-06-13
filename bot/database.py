@@ -19,6 +19,14 @@ def init_db():
         )
         """
     )
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -90,5 +98,48 @@ def list_active_subscriptions() -> list[dict]:
         }
         if not subscription_expired(sub):
             result.append(sub)
+    return result
+
+
+def set_setting(key: str, value: str):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+        (key, value),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_setting(key: str, default: Optional[str] = None) -> Optional[str]:
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT value FROM settings WHERE key=?", (key,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else default
+
+
+def get_all_subscriptions() -> list[dict]:
+    """Return all subscriptions including expired ones."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "SELECT user_id, token, start_date, duration, renewals FROM subscriptions"
+    )
+    rows = c.fetchall()
+    conn.close()
+    result = []
+    for row in rows:
+        result.append(
+            {
+                "user_id": row[0],
+                "token": row[1],
+                "start_date": datetime.fromisoformat(row[2]),
+                "duration": row[3],
+                "renewals": row[4],
+            }
+        )
     return result
 
