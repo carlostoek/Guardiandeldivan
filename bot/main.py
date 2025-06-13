@@ -151,7 +151,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Usuarios suscritos: {count}")
 
 
-async def main() -> None:
+def main() -> None:
     if not BOT_TOKEN or not CHANNEL_ID:
         raise RuntimeError("BOT_TOKEN y CHANNEL_ID deben estar definidos")
 
@@ -171,10 +171,8 @@ async def main() -> None:
 
     application.job_queue.run_repeating(check_expirations, interval=3600, first=0)
 
-    await application.run_polling()
+    application.run_polling()
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
+    main()
