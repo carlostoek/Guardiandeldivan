@@ -9,6 +9,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes,
 )
+from .messages import MESSAGES as MSG
 
 from .database import (
     init_db,
@@ -20,11 +21,9 @@ from .database import (
     set_setting,
     get_setting,
     get_all_subscriptions,
-    DB_NAME,
 )
 from .token_manager import generate_token, create_token
 from .database import use_token
-import sqlite3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ def admin_only(func):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if not is_admin(user_id):
-            await update.effective_message.reply_text("Acceso denegado")
+            await update.effective_message.reply_text(MSG["access_denied"])
             return
         return await func(update, context)
 
@@ -50,78 +49,74 @@ def admin_only(func):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_main_menu(
-        update,
-        context,
-        text="Bienvenido. Contacta con un administrador para obtener un token y luego selecciona una opción:",
-    )
+    await show_main_menu(update, context, text=MSG["start"])
 
 
 @admin_only
 async def gen_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
-        await update.effective_message.reply_text("Uso: /gen_token <1d|1w|2w|1m|forever>")
+        await update.effective_message.reply_text(MSG["gen_token_usage"])
         return
     key = context.args[0]
     token, days = create_token(key)
     await update.effective_message.reply_text(
-        f"Tu token es: {token}. Válido por {days} días."
+        MSG["gen_token_result"].format(token=token, days=days)
     )
 
 
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
-        await update.effective_message.reply_text("Debes proporcionar el token")
+        await update.effective_message.reply_text(MSG["join_token_missing"])
         return
     token = context.args[0]
     duration = use_token(token)
     if not duration:
-        await update.effective_message.reply_text("Token invalido o expirado")
+        await update.effective_message.reply_text(MSG["join_token_invalid"])
         return
     add_subscription(update.effective_user.id, token, duration)
     invite = await context.bot.create_chat_invite_link(CHANNEL_ID, member_limit=1)
     await update.effective_message.reply_text(
-        f"Acceso concedido al canal: {invite.invite_link}"
+        MSG["join_success"].format(link=invite.invite_link)
     )
 
 
 @admin_only
 async def add_sub(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 2:
-        await update.effective_message.reply_text("Uso: /add_sub <user_id> <duracion>")
+        await update.effective_message.reply_text(MSG["add_sub_usage"])
         return
     try:
         user_id = int(context.args[0])
     except ValueError:
-        await update.effective_message.reply_text("user_id debe ser numerico")
+        await update.effective_message.reply_text(MSG["add_sub_user_id_numeric"])
         return
     key = context.args[1]
     token, days = generate_token(key)
     add_subscription(user_id, token, days)
     await update.effective_message.reply_text(
-        f"Suscripcion creada para {user_id}. Token: {token}"
+        MSG["add_sub_success"].format(user_id=user_id, token=token)
     )
 
 
 @admin_only
 async def remove_sub(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
-        await update.effective_message.reply_text("Uso: /remove_sub <user_id>")
+        await update.effective_message.reply_text(MSG["remove_sub_usage"])
         return
     try:
         user_id = int(context.args[0])
     except ValueError:
-        await update.effective_message.reply_text("user_id debe ser numerico")
+        await update.effective_message.reply_text(MSG["remove_sub_user_id_numeric"])
         return
     remove_subscription(user_id)
-    await update.effective_message.reply_text("Suscripcion eliminada")
+    await update.effective_message.reply_text(MSG["remove_sub_success"])
 
 
 @admin_only
 async def list_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     subs = list_active_subscriptions()
     if not subs:
-        await update.effective_message.reply_text("No hay suscriptores activos")
+        await update.effective_message.reply_text(MSG["list_subs_none"])
         return
     lines = [
         f"{s['user_id']} - {s['start_date'].strftime('%Y-%m-%d')}" for s in subs
@@ -132,25 +127,25 @@ async def list_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @admin_only
 async def set_rate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 2:
-        await update.effective_message.reply_text("Uso: /set_rate <dias> <monto>")
+        await update.effective_message.reply_text(MSG["set_rate_usage"])
         return
     try:
         days = int(context.args[0])
         amount = float(context.args[1])
     except ValueError:
-        await update.effective_message.reply_text("Valores invalidos")
+        await update.effective_message.reply_text(MSG["set_rate_invalid"])
         return
     set_setting("rate_frequency", str(days))
     set_setting("rate_amount", str(amount))
     await update.effective_message.reply_text(
-        f"Tarifa guardada: cada {days} dias por {amount}"
+        MSG["set_rate_saved"].format(days=days, amount=amount)
     )
 
 
 @admin_only
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.effective_message.reply_text("Uso: /broadcast <mensaje>")
+        await update.effective_message.reply_text(MSG["broadcast_usage"])
         return
     message = " ".join(context.args)
     sent = 0
@@ -160,55 +155,52 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent += 1
         except Exception as exc:
             logger.error("Error enviando a %s: %s", sub["user_id"], exc)
-    await update.effective_message.reply_text(f"Mensaje enviado a {sent} usuarios")
+    await update.effective_message.reply_text(
+        MSG["broadcast_sent"].format(sent=sent)
+    )
 
 
 @admin_only
 async def gen_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 2:
-        await update.effective_message.reply_text(
-            "Uso: /gen_link <user_id> <duracion>"
-        )
+        await update.effective_message.reply_text(MSG["gen_link_usage"])
         return
     try:
         user_id = int(context.args[0])
     except ValueError:
-        await update.effective_message.reply_text("user_id debe ser numerico")
+        await update.effective_message.reply_text(MSG["gen_link_user_id_numeric"])
         return
     key = context.args[1]
     token, days = generate_token(key)
     add_subscription(user_id, token, days)
     bot_username = (await context.bot.get_me()).username
     link = f"https://t.me/{bot_username}?start={token}"
-    await update.effective_message.reply_text(f"Enlace de acceso: {link}")
+    await update.effective_message.reply_text(
+        MSG["gen_link_result"].format(link=link)
+    )
 
 
 @admin_only
 async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.effective_message.reply_text(
-        "Comandos admin:\n"
-        "/add_sub <user_id> <duracion> - Alta manual\n"
-        "/remove_sub <user_id> - Baja manual\n"
-        "/list_subs - Listar suscriptores activos\n"
-        "/set_rate <dias> <monto> - Configurar tarifa\n"
-        "/broadcast <mensaje> - Enviar mensaje a todos\n"
-        "/gen_link <user_id> <duracion> - Generar link con token"
-    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
+            MSG["admin_help"], parse_mode="HTML"
+        )
+    else:
+        await update.effective_message.reply_html(MSG["admin_help"])
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mostrar los comandos disponibles para cualquier usuario."""
-    await update.effective_message.reply_text(
-        "Comandos disponibles:\n"
-        "/start - Mensaje de bienvenida\n"
-        "/join <token> - Unirte al canal con un token valido\n"
-        "/stats - Estadisticas basicas\n"
-        "/help - Mostrar esta ayuda\n"
-        "/menu - Mostrar menu de botones"
-    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
+            MSG["help"], parse_mode="HTML"
+        )
+    else:
+        await update.effective_message.reply_html(MSG["help"])
 
 
-async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str = "Selecciona una opcion:"):
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str = MSG["menu_prompt"]):
     """Mostrar el menu principal adecuando opciones según el rol del usuario."""
     if is_admin(update.effective_user.id):
         keyboard = [
@@ -218,7 +210,10 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
     else:
         keyboard = [[InlineKeyboardButton("Solicitar token", callback_data="solicitar_token")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.effective_message.reply_text(text, reply_markup=reply_markup)
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
+    else:
+        await update.effective_message.reply_text(text, reply_markup=reply_markup)
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -243,19 +238,17 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as exc:
                 logger.error("No se pudo notificar a %s: %s", admin_id, exc)
-        await query.message.reply_text(
-            "Se ha notificado a los administradores, recibirás tu token pronto"
-        )
+        await query.answer(MSG["notify_admins"])
     elif data == "configuracion":
         keyboard = [
             [InlineKeyboardButton("Configurar tarifa", callback_data="set_tarifa")],
             [InlineKeyboardButton("Volver", callback_data="volver")],
         ]
-        await query.message.reply_text(
-            "Menú de configuración:", reply_markup=InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            MSG["config_menu"], reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data == "set_tarifa":
-        await query.message.reply_text("Uso: /set_rate <dias> <monto>")
+        await query.answer(MSG["set_rate_usage"])
     elif data == "administracion":
         keyboard = [
             [InlineKeyboardButton("Estadísticas", callback_data="admin_stats")],
@@ -265,15 +258,15 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("Suscriptores", callback_data="admin_subs")],
             [InlineKeyboardButton("Volver", callback_data="volver")],
         ]
-        await query.message.reply_text(
-            "Menú de administración:", reply_markup=InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            MSG["admin_menu"], reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data == "admin_stats":
         await stats(update, context)
     elif data == "admin_broadcast":
-        await query.message.reply_text("Uso: /broadcast <mensaje>")
+        await query.answer(MSG["broadcast_usage"])
     elif data == "admin_gen_link":
-        await query.message.reply_text("Uso: /gen_link <user_id> <duracion>")
+        await query.answer(MSG["gen_link_usage"])
     elif data == "admin_gen_token":
         keyboard = [
             [
@@ -287,14 +280,13 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("Permanente", callback_data="token_forever")],
             [InlineKeyboardButton("Volver", callback_data="administracion")],
         ]
-        await query.message.reply_text(
-            "Elige duración para el token:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+        await query.edit_message_text(
+            MSG["token_duration_menu"], reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data == "admin_subs":
         subs = list_active_subscriptions()
         if not subs:
-            await query.message.reply_text("No hay suscriptores activos")
+            await query.answer(MSG["list_subs_none"])
         else:
             keyboard = [
                 [
@@ -305,14 +297,14 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for s in subs
             ]
             keyboard.append([InlineKeyboardButton("Volver", callback_data="administracion")])
-            await query.message.reply_text(
+            await query.edit_message_text(
                 "Suscriptores:", reply_markup=InlineKeyboardMarkup(keyboard)
             )
     elif data.startswith("sub_"):
         user_id = int(data.split("_")[1])
         sub = get_subscription(user_id)
         if not sub:
-            await query.message.reply_text("Suscriptor no encontrado")
+            await query.answer(MSG["subscriber_not_found"])
         else:
             end_date = sub["start_date"] + timedelta(days=sub["duration"])
             tiempo = datetime.utcnow() - sub["start_date"]
@@ -327,28 +319,28 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("Expulsar", callback_data=f"expulsar_{user_id}")],
                 [InlineKeyboardButton("Volver", callback_data="admin_subs")],
             ]
-            await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     elif data.startswith("expulsar_"):
         user_id = int(data.split("_")[1])
         await context.bot.ban_chat_member(CHANNEL_ID, user_id)
         remove_subscription(user_id)
-        await query.message.reply_text("Usuario expulsado")
+        await query.answer(MSG["user_removed"])
     elif data.startswith("token_"):
         key = data.split("_")[1]
         token, days = create_token(key)
-        await query.message.reply_text(
-            f"Token generado:\n{token}\nVálido por {days} días"
+        await query.edit_message_text(
+            MSG["token_generated"].format(token=token, days=days)
         )
     elif data == "volver":
         await show_main_menu(update, context)
     elif data == "list_subs":
         await list_subs(update, context)
     elif data == "add_sub":
-        await query.message.reply_text("Uso: /add_sub <user_id> <duracion>")
+        await query.answer(MSG["add_sub_menu_usage"])
     elif data == "remove_sub":
-        await query.message.reply_text("Uso: /remove_sub <user_id>")
+        await query.answer(MSG["remove_sub_menu_usage"])
     elif data == "join":
-        await query.message.reply_text("Uso: /join <token>")
+        await query.answer(MSG["join_menu_usage"])
 
 
 async def check_expirations(context: ContextTypes.DEFAULT_TYPE):
@@ -372,14 +364,16 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         and subscription_expired(s)
     )
     reactions = 0  # TODO: obtener reacciones del canal
-    text = (
-        f"📊 <b>Estadísticas</b>\n"
-        f"👥 Suscriptores activos: <b>{total}</b>\n"
-        f"✅ Entraron esta semana: <b>{joined_week}</b>\n"
-        f"❌ Salieron esta semana: <b>{left_week}</b>\n"
-        f"👍 Reacciones totales: <b>{reactions}</b>"
+    text = MSG["stats_template"].format(
+        total=total,
+        joined_week=joined_week,
+        left_week=left_week,
+        reactions=reactions,
     )
-    await update.effective_message.reply_html(text)
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, parse_mode="HTML")
+    else:
+        await update.effective_message.reply_html(text)
 
 
 def main() -> None:
