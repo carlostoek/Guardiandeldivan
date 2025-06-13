@@ -46,8 +46,10 @@ def admin_only(func):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.effective_message.reply_text(
-        "Bienvenido. Contacta con un administrador para obtener un token y luego usa /join <token>."
+    await show_main_menu(
+        update,
+        context,
+        text="Bienvenido. Contacta con un administrador para obtener un token y luego selecciona una opción:",
     )
 
 
@@ -146,24 +148,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Mostrar un menu de botones con los comandos disponibles."""
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str = "Selecciona una opcion:"):
+    """Mostrar el menu principal con opciones basicas."""
     keyboard = [
-        [InlineKeyboardButton("/help", callback_data="help")],
-        [InlineKeyboardButton("/join", callback_data="join")],
-        [InlineKeyboardButton("/stats", callback_data="stats")],
+        [InlineKeyboardButton("Configuración", callback_data="configuracion")],
+        [InlineKeyboardButton("Administración", callback_data="administracion")],
     ]
-    if is_admin(update.effective_user.id):
-        keyboard.extend(
-            [
-                [InlineKeyboardButton("/gen_token", callback_data="gen_token")],
-                [InlineKeyboardButton("/add_sub", callback_data="add_sub")],
-                [InlineKeyboardButton("/remove_sub", callback_data="remove_sub")],
-                [InlineKeyboardButton("/list_subs", callback_data="list_subs")],
-            ]
-        )
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.effective_message.reply_text("Selecciona una opcion:", reply_markup=reply_markup)
+    await update.effective_message.reply_text(text, reply_markup=reply_markup)
+
+
+async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostrar el menu principal."""
+    await show_main_menu(update, context)
 
 
 async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -174,6 +171,10 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_command(update, context)
     elif data == "stats":
         await stats(update, context)
+    elif data == "configuracion":
+        await query.message.reply_text("Menú de configuración en desarrollo")
+    elif data == "administracion":
+        await query.message.reply_text("Menú de administración en desarrollo")
     elif data == "list_subs":
         await list_subs(update, context)
     elif data == "gen_token":
