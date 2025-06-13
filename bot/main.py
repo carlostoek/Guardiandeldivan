@@ -22,7 +22,8 @@ from .database import (
     get_all_subscriptions,
     DB_NAME,
 )
-from .token_manager import generate_token
+from .token_manager import generate_token, create_token
+from .database import use_token
 import sqlite3
 
 logging.basicConfig(level=logging.INFO)
@@ -62,10 +63,9 @@ async def gen_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text("Uso: /gen_token <1d|1w|2w|1m|forever>")
         return
     key = context.args[0]
-    token, days = generate_token(key)
-    add_subscription(update.effective_user.id, token, days)
+    token, days = create_token(key)
     await update.effective_message.reply_text(
-        f"Tu token es: {token}. Valido por {days} dias."
+        f"Tu token es: {token}. Válido por {days} días."
     )
 
 
@@ -74,10 +74,11 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_text("Debes proporcionar el token")
         return
     token = context.args[0]
-    sub = get_subscription(update.effective_user.id)
-    if not sub or sub["token"] != token or subscription_expired(sub):
+    duration = use_token(token)
+    if not duration:
         await update.effective_message.reply_text("Token invalido o expirado")
         return
+    add_subscription(update.effective_user.id, token, duration)
     invite = await context.bot.create_chat_invite_link(CHANNEL_ID, member_limit=1)
     await update.effective_message.reply_text(
         f"Acceso concedido al canal: {invite.invite_link}"
@@ -186,7 +187,6 @@ async def gen_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(
         "Comandos admin:\n"
-        "/gen_token <duracion> - Generar token para un usuario\n"
         "/add_sub <user_id> <duracion> - Alta manual\n"
         "/remove_sub <user_id> - Baja manual\n"
         "/list_subs - Listar suscriptores activos\n"
@@ -261,6 +261,7 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("Estadísticas", callback_data="admin_stats")],
             [InlineKeyboardButton("Enviar broadcast", callback_data="admin_broadcast")],
             [InlineKeyboardButton("Generar link", callback_data="admin_gen_link")],
+            [InlineKeyboardButton("Generar token", callback_data="admin_gen_token")],
             [InlineKeyboardButton("Suscriptores", callback_data="admin_subs")],
             [InlineKeyboardButton("Volver", callback_data="volver")],
         ]
@@ -273,6 +274,23 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("Uso: /broadcast <mensaje>")
     elif data == "admin_gen_link":
         await query.message.reply_text("Uso: /gen_link <user_id> <duracion>")
+    elif data == "admin_gen_token":
+        keyboard = [
+            [
+                InlineKeyboardButton("1 día", callback_data="token_1d"),
+                InlineKeyboardButton("1 semana", callback_data="token_1w"),
+            ],
+            [
+                InlineKeyboardButton("2 semanas", callback_data="token_2w"),
+                InlineKeyboardButton("1 mes", callback_data="token_1m"),
+            ],
+            [InlineKeyboardButton("Permanente", callback_data="token_forever")],
+            [InlineKeyboardButton("Volver", callback_data="administracion")],
+        ]
+        await query.message.reply_text(
+            "Elige duración para el token:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     elif data == "admin_subs":
         subs = list_active_subscriptions()
         if not subs:
@@ -315,12 +333,16 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.ban_chat_member(CHANNEL_ID, user_id)
         remove_subscription(user_id)
         await query.message.reply_text("Usuario expulsado")
+    elif data.startswith("token_"):
+        key = data.split("_")[1]
+        token, days = create_token(key)
+        await query.message.reply_text(
+            f"Token generado:\n{token}\nVálido por {days} días"
+        )
     elif data == "volver":
         await show_main_menu(update, context)
     elif data == "list_subs":
         await list_subs(update, context)
-    elif data == "gen_token":
-        await query.message.reply_text("Uso: /gen_token <duracion>")
     elif data == "add_sub":
         await query.message.reply_text("Uso: /add_sub <user_id> <duracion>")
     elif data == "remove_sub":
@@ -339,12 +361,25 @@ async def check_expirations(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM subscriptions")
-    count = c.fetchone()[0]
-    conn.close()
-    await update.effective_message.reply_text(f"Usuarios suscritos: {count}")
+    subs = get_all_subscriptions()
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    total = sum(1 for s in subs if not subscription_expired(s))
+    joined_week = sum(1 for s in subs if s["start_date"] >= week_ago)
+    left_week = sum(
+        1
+        for s in subs
+        if (s["start_date"] + timedelta(days=s["duration"])) >= week_ago
+        and subscription_expired(s)
+    )
+    reactions = 0  # TODO: obtener reacciones del canal
+    text = (
+        f"📊 <b>Estadísticas</b>\n"
+        f"👥 Suscriptores activos: <b>{total}</b>\n"
+        f"✅ Entraron esta semana: <b>{joined_week}</b>\n"
+        f"❌ Salieron esta semana: <b>{left_week}</b>\n"
+        f"👍 Reacciones totales: <b>{reactions}</b>"
+    )
+    await update.effective_message.reply_html(text)
 
 
 def main() -> None:
