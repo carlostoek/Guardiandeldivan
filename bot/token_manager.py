@@ -17,3 +17,12 @@ def generate_token(duration_key: str) -> tuple[str, int]:
     token = secrets.token_urlsafe(8)
     return token, duration
 
+
+def create_token(duration_key: str):
+    """Create and store a token, returning it and its duration."""
+    from .database import save_token
+
+    token, duration = generate_token(duration_key)
+    save_token(token, duration)
+    return token, duration
+

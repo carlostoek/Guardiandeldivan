@@ -27,6 +27,16 @@ def init_db():
         )
         """
     )
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tokens (
+            token TEXT PRIMARY KEY,
+            duration INTEGER,
+            used INTEGER DEFAULT 0,
+            created_at TEXT
+        )
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -142,4 +152,30 @@ def get_all_subscriptions() -> list[dict]:
             }
         )
     return result
+
+
+def save_token(token: str, duration: int):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "INSERT OR REPLACE INTO tokens (token, duration, used, created_at) VALUES (?, ?, 0, ?)",
+        (token, duration, datetime.utcnow().isoformat()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def use_token(token: str) -> Optional[int]:
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT duration, used FROM tokens WHERE token=?", (token,))
+    row = c.fetchone()
+    if not row or row[1]:
+        conn.close()
+        return None
+    duration = row[0]
+    c.execute("UPDATE tokens SET used=1 WHERE token=?", (token,))
+    conn.commit()
+    conn.close()
+    return duration
 
