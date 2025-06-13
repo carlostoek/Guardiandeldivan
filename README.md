@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 ## Uso rápido
 
-Crea la variable de entorno `BOT_TOKEN` con el token de tu bot y ejecuta:
+Crea las variables de entorno `BOT_TOKEN` (token de tu bot) y `CHANNEL_ID` (ID del canal a administrar) y ejecuta:
 
 ```bash
 python -m bot.main
