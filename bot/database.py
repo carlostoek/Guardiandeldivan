@@ -69,3 +69,26 @@ def subscription_expired(sub: dict) -> bool:
     end_date = sub["start_date"] + timedelta(days=sub["duration"])
     return datetime.utcnow() > end_date
 
+
+def list_active_subscriptions() -> list[dict]:
+    """Return a list of active subscriptions with parsed dates."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "SELECT user_id, token, start_date, duration, renewals FROM subscriptions"
+    )
+    rows = c.fetchall()
+    conn.close()
+    result = []
+    for row in rows:
+        sub = {
+            "user_id": row[0],
+            "token": row[1],
+            "start_date": datetime.fromisoformat(row[2]),
+            "duration": row[3],
+            "renewals": row[4],
+        }
+        if not subscription_expired(sub):
+            result.append(sub)
+    return result
+
