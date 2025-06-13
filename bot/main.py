@@ -1,8 +1,13 @@
 import os
 import logging
 from datetime import datetime
+import pytz
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+)
 
 from .database import (
     init_db,
@@ -29,91 +34,97 @@ def is_admin(user_id: int) -> bool:
 
 
 def admin_only(func):
-    def wrapper(update: Update, context: CallbackContext):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         if not is_admin(user_id):
-            update.message.reply_text("Acceso denegado")
+            await update.message.reply_text("Acceso denegado")
             return
-        return func(update, context)
+        return await func(update, context)
 
     return wrapper
 
 
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text(
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
         "Bienvenido. Contacta con un administrador para obtener un token y luego usa /join <token>."
     )
 
 
 @admin_only
-def gen_token(update: Update, context: CallbackContext):
+async def gen_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
-        update.message.reply_text("Uso: /gen_token <1d|1w|2w|1m|forever>")
+        await update.message.reply_text("Uso: /gen_token <1d|1w|2w|1m|forever>")
         return
     key = context.args[0]
     token, days = generate_token(key)
     add_subscription(update.effective_user.id, token, days)
-    update.message.reply_text(f"Tu token es: {token}. Valido por {days} dias.")
+    await update.message.reply_text(
+        f"Tu token es: {token}. Valido por {days} dias."
+    )
 
 
-def join(update: Update, context: CallbackContext):
+async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
-        update.message.reply_text("Debes proporcionar el token")
+        await update.message.reply_text("Debes proporcionar el token")
         return
     token = context.args[0]
     sub = get_subscription(update.effective_user.id)
     if not sub or sub["token"] != token or subscription_expired(sub):
-        update.message.reply_text("Token invalido o expirado")
+        await update.message.reply_text("Token invalido o expirado")
         return
-    context.bot.invite_chat_member(CHANNEL_ID, update.effective_user.id)
-    update.message.reply_text("Acceso concedido al canal")
+    invite = await context.bot.create_chat_invite_link(CHANNEL_ID, member_limit=1)
+    await update.message.reply_text(
+        f"Acceso concedido al canal: {invite.invite_link}"
+    )
 
 
 @admin_only
-def add_sub(update: Update, context: CallbackContext):
+async def add_sub(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 2:
-        update.message.reply_text("Uso: /add_sub <user_id> <duracion>")
+        await update.message.reply_text("Uso: /add_sub <user_id> <duracion>")
         return
     try:
         user_id = int(context.args[0])
     except ValueError:
-        update.message.reply_text("user_id debe ser numerico")
+        await update.message.reply_text("user_id debe ser numerico")
         return
     key = context.args[1]
     token, days = generate_token(key)
     add_subscription(user_id, token, days)
-    update.message.reply_text(f"Suscripcion creada para {user_id}. Token: {token}")
+    await update.message.reply_text(
+        f"Suscripcion creada para {user_id}. Token: {token}"
+    )
 
 
 @admin_only
-def remove_sub(update: Update, context: CallbackContext):
+async def remove_sub(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
-        update.message.reply_text("Uso: /remove_sub <user_id>")
+        await update.message.reply_text("Uso: /remove_sub <user_id>")
         return
     try:
         user_id = int(context.args[0])
     except ValueError:
-        update.message.reply_text("user_id debe ser numerico")
+        await update.message.reply_text("user_id debe ser numerico")
         return
     remove_subscription(user_id)
-    update.message.reply_text("Suscripcion eliminada")
+    await update.message.reply_text("Suscripcion eliminada")
 
 
 @admin_only
-def list_subs(update: Update, context: CallbackContext):
+async def list_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     subs = list_active_subscriptions()
     if not subs:
-        update.message.reply_text("No hay suscriptores activos")
+        await update.message.reply_text("No hay suscriptores activos")
         return
     lines = [
         f"{s['user_id']} - {s['start_date'].strftime('%Y-%m-%d')}" for s in subs
     ]
-    update.message.reply_text("\n".join(lines))
+    await update.message.reply_text("\n".join(lines))
 
 
 @admin_only
-def admin_help(update: Update, context: CallbackContext):
-    update.message.reply_text(
+async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
         "Comandos admin:\n"
         "/gen_token <duracion> - Generar token para un usuario\n"
         "/add_sub <user_id> <duracion> - Alta manual\n"
@@ -122,47 +133,48 @@ def admin_help(update: Update, context: CallbackContext):
     )
 
 
-def check_expirations(context: CallbackContext):
-    for user_id in context.dispatcher.chat_data.get("subscriptions", {}).keys():
-        sub = get_subscription(user_id)
-        if sub and subscription_expired(sub):
+async def check_expirations(context: ContextTypes.DEFAULT_TYPE):
+    for sub in list_active_subscriptions():
+        if subscription_expired(sub):
+            user_id = sub["user_id"]
             logger.info("Expulsando %s por expiracion", user_id)
-            context.bot.kick_chat_member(CHANNEL_ID, user_id)
+            await context.bot.ban_chat_member(CHANNEL_ID, user_id)
             remove_subscription(user_id)
 
 
-def stats(update: Update, context: CallbackContext):
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM subscriptions")
     count = c.fetchone()[0]
     conn.close()
-    update.message.reply_text(f"Usuarios suscritos: {count}")
+    await update.message.reply_text(f"Usuarios suscritos: {count}")
 
 
-def main():
+async def main() -> None:
     if not BOT_TOKEN or not CHANNEL_ID:
         raise RuntimeError("BOT_TOKEN y CHANNEL_ID deben estar definidos")
+
     init_db()
 
-    updater = Updater(BOT_TOKEN)
-    dp = updater.dispatcher
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application.job_queue.scheduler.configure(timezone=pytz.utc)
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("gen_token", gen_token))
-    dp.add_handler(CommandHandler("join", join))
-    dp.add_handler(CommandHandler("stats", stats))
-    dp.add_handler(CommandHandler("add_sub", add_sub))
-    dp.add_handler(CommandHandler("remove_sub", remove_sub))
-    dp.add_handler(CommandHandler("list_subs", list_subs))
-    dp.add_handler(CommandHandler("admin", admin_help))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("gen_token", gen_token))
+    application.add_handler(CommandHandler("join", join))
+    application.add_handler(CommandHandler("stats", stats))
+    application.add_handler(CommandHandler("add_sub", add_sub))
+    application.add_handler(CommandHandler("remove_sub", remove_sub))
+    application.add_handler(CommandHandler("list_subs", list_subs))
+    application.add_handler(CommandHandler("admin", admin_help))
 
-    job_queue = updater.job_queue
-    job_queue.run_repeating(check_expirations, interval=3600, first=0)
+    application.job_queue.run_repeating(check_expirations, interval=3600, first=0)
 
-    updater.start_polling()
-    updater.idle()
+    await application.run_polling()
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(main())
