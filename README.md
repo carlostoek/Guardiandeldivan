@@ -50,6 +50,7 @@ python -m bot.main
 
 - `/start` muestra la bienvenida.
 - `/help` lista los comandos disponibles.
+- `/menu` muestra un menú con botones para los comandos.
 - `/join <token>` accede al canal con un token.
 - `/stats` muestra el numero total de suscriptores.
 
