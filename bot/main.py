@@ -209,11 +209,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str = "Selecciona una opcion:"):
-    """Mostrar el menu principal con opciones basicas."""
-    keyboard = [
-        [InlineKeyboardButton("Configuración", callback_data="configuracion")],
-        [InlineKeyboardButton("Administración", callback_data="administracion")],
-    ]
+    """Mostrar el menu principal adecuando opciones según el rol del usuario."""
+    if is_admin(update.effective_user.id):
+        keyboard = [
+            [InlineKeyboardButton("Configuración", callback_data="configuracion")],
+            [InlineKeyboardButton("Administración", callback_data="administracion")],
+        ]
+    else:
+        keyboard = [[InlineKeyboardButton("Solicitar token", callback_data="solicitar_token")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.effective_message.reply_text(text, reply_markup=reply_markup)
 
@@ -231,6 +234,18 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_command(update, context)
     elif data == "stats":
         await stats(update, context)
+    elif data == "solicitar_token":
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(
+                    admin_id,
+                    f"El usuario {update.effective_user.id} solicita un token",
+                )
+            except Exception as exc:
+                logger.error("No se pudo notificar a %s: %s", admin_id, exc)
+        await query.message.reply_text(
+            "Se ha notificado a los administradores, recibirás tu token pronto"
+        )
     elif data == "configuracion":
         keyboard = [
             [InlineKeyboardButton("Configurar tarifa", callback_data="set_tarifa")],

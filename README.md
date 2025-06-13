@@ -56,6 +56,7 @@ python -m bot.main
 - `/menu` muestra un menú con botones para los comandos.
 - `/join <token>` accede al canal con un token.
 - `/stats` muestra el numero total de suscriptores.
+- Desde el menú de usuario puedes pulsar **Solicitar token** para que los administradores generen uno.
 
 ## Notas de desarrollo
 
