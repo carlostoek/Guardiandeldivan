@@ -30,3 +30,4 @@ python -m bot.main
 ## Notas de desarrollo
 
 El bot gestiona usuarios, fechas de ingreso y expiración de suscripciones. Envía recordatorios por privado y expulsa del canal cuando la suscripción expira. Los administradores podrán consultar estadísticas básicas.
+main
