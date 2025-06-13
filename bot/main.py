@@ -133,6 +133,17 @@ async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostrar los comandos disponibles para cualquier usuario."""
+    await update.message.reply_text(
+        "Comandos disponibles:\n"
+        "/start - Mensaje de bienvenida\n"
+        "/join <token> - Unirte al canal con un token valido\n"
+        "/stats - Estadisticas basicas\n"
+        "/help - Mostrar esta ayuda"
+    )
+
+
 async def check_expirations(context: ContextTypes.DEFAULT_TYPE):
     for sub in list_active_subscriptions():
         if subscription_expired(sub):
@@ -168,6 +179,7 @@ def main() -> None:
     application.add_handler(CommandHandler("remove_sub", remove_sub))
     application.add_handler(CommandHandler("list_subs", list_subs))
     application.add_handler(CommandHandler("admin", admin_help))
+    application.add_handler(CommandHandler("help", help_command))
 
     application.job_queue.run_repeating(check_expirations, interval=3600, first=0)
 

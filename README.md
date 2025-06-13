@@ -46,6 +46,13 @@ python -m bot.main
 - `/remove_sub <user_id>` da de baja a un usuario.
 - `/list_subs` lista los usuarios activos con su fecha de entrada.
 
+### Comandos de usuario
+
+- `/start` muestra la bienvenida.
+- `/help` lista los comandos disponibles.
+- `/join <token>` accede al canal con un token.
+- `/stats` muestra el numero total de suscriptores.
+
 ## Notas de desarrollo
 
 El bot gestiona usuarios, fechas de ingreso y expiración de suscripciones. Envía recordatorios por privado y expulsa del canal cuando la suscripción expira. Los administradores podrán consultar estadísticas básicas.
