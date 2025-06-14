@@ -46,6 +46,7 @@ python -m bot.main
 - `/remove_sub <user_id>` da de baja a un usuario.
 - `/list_subs` lista los usuarios activos con su fecha de entrada.
 - `/set_rate <dias> <monto>` define la tarifa y periodo de cobro.
+- `Mensaje recordatorio` y `Mensaje expiración` en el menú de configuración permiten definir los textos que se envían antes de que caduque la suscripción y al momento de expulsar al usuario.
 - `/broadcast <mensaje>` envía un mensaje a todos los suscriptores.
 - `/gen_link <user_id> <duracion>` genera un enlace con token para un usuario.
 
