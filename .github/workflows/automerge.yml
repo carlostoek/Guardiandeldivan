@@ -1,0 +1,31 @@
+name: Automerge PR from Codex
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  automerge:
+    if: github.actor == 'github-codex[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+
+            if (pr.mergeable_state === 'clean') {
+              await github.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                merge_method: "squash"
+              });
+              console.log("PR merged automáticamente 🎉");
+            } else {
+              console.log("PR no mergeable todavía ⏳");
+            }
