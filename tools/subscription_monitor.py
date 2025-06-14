@@ -6,6 +6,7 @@ from aiogram.exceptions import TelegramAPIError
 from bot import bot
 from database import get_db
 from services.subscription_service import remove_subscription
+from services.config_service import get_config
 
 
 async def _check_subscriptions() -> None:
@@ -13,6 +14,8 @@ async def _check_subscriptions() -> None:
     db = get_db()
     now = datetime.datetime.utcnow()
     tomorrow = now + datetime.timedelta(days=1)
+    reminder_msg = await get_config("reminder_msg") or "Tu suscripción expirará mañana."
+    expiration_msg = await get_config("expiration_msg") or "Tu suscripción ha expirado."
     async with db.execute("SELECT user_id, end_date FROM subscription") as cursor:
         rows = await cursor.fetchall()
 
@@ -23,13 +26,13 @@ async def _check_subscriptions() -> None:
         if now < end_date <= tomorrow:
             # Notify user subscription expires in one day
             try:
-                await bot.send_message(user_id, "Tu suscripción expirará mañana.")
+                await bot.send_message(user_id, reminder_msg)
             except TelegramAPIError:
                 pass
         elif end_date <= now:
             await remove_subscription(user_id)
             try:
-                await bot.send_message(user_id, "Tu suscripción ha expirado.")
+                await bot.send_message(user_id, expiration_msg)
             except TelegramAPIError:
                 pass
 
