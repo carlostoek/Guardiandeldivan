@@ -12,6 +12,7 @@ async def init_db(path: str = "db.sqlite3") -> aiosqlite.Connection:
     if _db is None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         _db = await aiosqlite.connect(path)
+        _db.row_factory = aiosqlite.Row
         await _db.executescript(SCHEMA)
         await _db.commit()
     return _db

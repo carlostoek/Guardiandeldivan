@@ -1,6 +1,14 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+__all__ = [
+    "User",
+    "Subscription",
+    "Token",
+    "Config",
+    "SCHEMA",
+]
+
 # SQLite schema definitions and data models
 
 @dataclass
