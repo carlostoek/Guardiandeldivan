@@ -12,6 +12,12 @@ from telegram.ext import (
     filters,
 )
 from .messages import MESSAGES as MSG
+from .handlers.user.start import start
+from .handlers.admin.config_messages import (
+    set_reminder_message,
+    set_expiration_message,
+)
+from .services.subscription_monitor import setup_subscription_monitor
 
 from .database import (
     init_db,
@@ -24,10 +30,10 @@ from .database import (
     set_setting,
     get_setting,
     get_all_subscriptions,
-    mark_reminder_sent,
 )
 from .token_manager import generate_token, create_token
 from .database import use_token
+from .utils.config import init_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,8 +58,6 @@ def admin_only(func):
     return wrapper
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_main_menu(update, context, text=MSG["start"])
 
 
 @admin_only
@@ -473,28 +477,6 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(MSG["join_menu_usage"])
 
 
-async def check_expirations(context: ContextTypes.DEFAULT_TYPE):
-    reminder_text = get_setting("reminder_message", "Tu suscripción termina mañana")
-    expired_text = get_setting("expiration_message", "Tu suscripción ha expirado")
-    now = datetime.utcnow()
-    for sub in get_all_subscriptions():
-        end_date = sub["start_date"] + timedelta(days=sub["duration"])
-        remaining = end_date - now
-        user_id = sub["user_id"]
-        if remaining <= timedelta(days=1) and remaining > timedelta(0) and not sub.get("reminder_sent"):
-            try:
-                await context.bot.send_message(user_id, reminder_text)
-            except Exception as exc:
-                logger.error("No se pudo enviar recordatorio a %s: %s", user_id, exc)
-            mark_reminder_sent(user_id)
-        elif remaining <= timedelta(0):
-            try:
-                await context.bot.send_message(user_id, expired_text)
-            except Exception as exc:
-                logger.error("No se pudo notificar expiración a %s: %s", user_id, exc)
-            logger.info("Expulsando %s por expiracion", user_id)
-            await context.bot.ban_chat_member(CHANNEL_ID, user_id)
-            remove_subscription(user_id)
 
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -534,11 +516,14 @@ def main() -> None:
         raise RuntimeError("BOT_TOKEN y CHANNEL_ID deben estar definidos")
 
     init_db()
+    init_config()
 
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.job_queue.scheduler.configure(timezone=pytz.utc)
 
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("set_reminder", set_reminder_message))
+    application.add_handler(CommandHandler("set_expiration", set_expiration_message))
     application.add_handler(CommandHandler("gen_token", gen_token))
     application.add_handler(CommandHandler("join", join))
     application.add_handler(CommandHandler("stats", stats))
@@ -555,7 +540,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(menu_button))
 
-    application.job_queue.run_repeating(check_expirations, interval=3600, first=0)
+    setup_subscription_monitor(application)
 
     application.run_polling()
 

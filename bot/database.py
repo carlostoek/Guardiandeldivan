@@ -26,6 +26,19 @@ def init_db():
         pass
     c.execute(
         """
+        CREATE TABLE IF NOT EXISTS user_subscriptions (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            full_name TEXT,
+            join_date TEXT,
+            expiration_date TEXT,
+            reminded INTEGER DEFAULT 0,
+            expired_notified INTEGER DEFAULT 0
+        )
+        """
+    )
+    c.execute(
+        """
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
@@ -241,3 +254,68 @@ def list_tokens(
         )
     return result
 
+
+# ---- New subscription helpers ----
+
+def add_user_subscription(user_id: int, username: str, full_name: str, expiration_date: datetime):
+    """Register or update a user subscription."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    join_date = datetime.utcnow().isoformat()
+    c.execute(
+        """
+        INSERT OR REPLACE INTO user_subscriptions
+            (user_id, username, full_name, join_date, expiration_date, reminded, expired_notified)
+        VALUES (?, ?, ?, ?, ?, COALESCE((SELECT reminded FROM user_subscriptions WHERE user_id=?),0),
+                COALESCE((SELECT expired_notified FROM user_subscriptions WHERE user_id=?),0))
+        """,
+        (user_id, username, full_name, join_date, expiration_date.isoformat(), user_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_all_user_subscriptions() -> list[dict]:
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "SELECT user_id, username, full_name, join_date, expiration_date, reminded, expired_notified FROM user_subscriptions"
+    )
+    rows = c.fetchall()
+    conn.close()
+    result = []
+    for row in rows:
+        result.append(
+            {
+                "user_id": row[0],
+                "username": row[1],
+                "full_name": row[2],
+                "join_date": datetime.fromisoformat(row[3]),
+                "expiration_date": datetime.fromisoformat(row[4]),
+                "reminded": row[5],
+                "expired_notified": row[6],
+            }
+        )
+    return result
+
+
+def mark_user_reminded(user_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "UPDATE user_subscriptions SET reminded=1 WHERE user_id=?",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
+def mark_user_expired_notified(user_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "UPDATE user_subscriptions SET expired_notified=1 WHERE user_id=?",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
