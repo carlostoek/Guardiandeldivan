@@ -1,9 +1,13 @@
 import asyncio
 
 from bot import bot, dp
+from database import init_db
+from handlers.user import start_router
 
 
 async def main() -> None:
+    await init_db()
+    dp.include_router(start_router)
     await dp.start_polling(bot)
 
 
