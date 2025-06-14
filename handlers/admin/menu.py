@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from aiogram import Router
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message
 
-from services.config_service import get_pricing
+from services.config_service import get_pricing, set_price
 from services.subscription_service import list_active_subscriptions, remove_subscription
 from services.token_service import generate_token
 from bot import messages
@@ -11,6 +11,9 @@ from config import settings
 
 router = Router()
 __all__ = ["ADMIN_MENU_KB", "router"]
+
+# Temporary storage for admins currently setting a price
+_waiting_price: dict[int, str] = {}
 
 ADMIN_MENU_KB = InlineKeyboardMarkup(
     inline_keyboard=[
@@ -23,6 +26,17 @@ SETTINGS_MENU_KB = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="Definir precio", callback_data="settings_set_price")],
         [InlineKeyboardButton(text="Volver", callback_data="back_admin_menu")],
+    ]
+)
+
+PRICE_PERIOD_KB = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="1 día", callback_data="price_period:1d")],
+        [InlineKeyboardButton(text="1 semana", callback_data="price_period:1w")],
+        [InlineKeyboardButton(text="2 semanas", callback_data="price_period:2w")],
+        [InlineKeyboardButton(text="1 mes", callback_data="price_period:1m")],
+        [InlineKeyboardButton(text="Permanente", callback_data="price_period:perm")],
+        [InlineKeyboardButton(text="Volver", callback_data="admin_settings")],
     ]
 )
 
@@ -44,6 +58,24 @@ async def cb_settings(callback: CallbackQuery) -> None:
     if pricing:
         text += "\n" + messages.CURRENT_PRICE.format(period=pricing[0], amount=pricing[1])
     await callback.message.edit_text(text, reply_markup=SETTINGS_MENU_KB)
+    await callback.answer()
+
+
+@router.callback_query(lambda c: c.data == "settings_set_price")
+async def cb_set_price(callback: CallbackQuery) -> None:
+    await callback.message.edit_text(messages.PRICE_SELECT_PERIOD, reply_markup=PRICE_PERIOD_KB)
+    await callback.answer()
+
+
+@router.callback_query(lambda c: c.data.startswith("price_period:"))
+async def cb_price_period(callback: CallbackQuery) -> None:
+    period = callback.data.split(":", 1)[1]
+    tg_id = callback.from_user.id if callback.from_user else None
+    if tg_id is None:
+        await callback.answer()
+        return
+    _waiting_price[tg_id] = period
+    await callback.message.edit_text(messages.PRICE_ENTER_AMOUNT)
     await callback.answer()
 
 
@@ -110,3 +142,19 @@ async def cb_remove(callback: CallbackQuery) -> None:
     await remove_subscription(user_id)
     await callback.message.answer(messages.USER_REMOVED.format(user_id=user_id))
     await callback.answer()
+
+
+@router.message(lambda m: m.from_user and m.from_user.id in _waiting_price)
+async def price_input(message: Message) -> None:
+    tg_id = message.from_user.id
+    period = _waiting_price.get(tg_id)
+    if period is None:
+        return
+    amount = message.text.strip()
+    if not amount.isdigit():
+        await message.answer(messages.PRICE_ENTER_AMOUNT)
+        return
+    del _waiting_price[tg_id]
+    await set_price(period, amount)
+    await message.answer(messages.PRICE_UPDATED.format(period=period, amount=amount))
+
