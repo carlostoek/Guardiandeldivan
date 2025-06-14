@@ -30,7 +30,7 @@ async def cmd_gen_token(message: Message, command: Command.CommandObject) -> Non
     except ValueError:
         days = 0
     if days <= 0:
-        await message.answer("Uso: /gen_token <días>")
+        await message.answer("Uso: /gen_token &lt;días&gt;")
         return
 
     token = await generate_token(days)
@@ -52,7 +52,7 @@ async def cmd_join(message: Message, command: Command.CommandObject) -> None:
 
     token = command.args.strip() if command.args else None
     if not token:
-        await message.answer("Uso: /join <token>")
+        await message.answer("Uso: /join &lt;token&gt;")
         return
 
     duration = await validate_token(token)

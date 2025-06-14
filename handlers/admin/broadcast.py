@@ -27,7 +27,7 @@ async def cmd_broadcast(message: Message, command: Command.CommandObject) -> Non
 
     text = command.args.strip() if command.args else None
     if not text:
-        await message.answer("Uso: /broadcast <texto>")
+        await message.answer("Uso: /broadcast &lt;texto&gt;")
         return
 
     subs = await list_active_subscriptions()
