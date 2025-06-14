@@ -35,3 +35,17 @@ SUB_ADDED = "Suscripción añadida por {days} días para @{username}"
 SUB_REMOVED = "Suscripción eliminada para @{username}"
 REMINDER_UPDATED = "Mensaje de recordatorio actualizado"
 EXPIRATION_UPDATED = "Mensaje de expiración actualizado"
+# Admin menus
+SETTINGS_MENU = "Menú de configuración"
+ADMINISTRATION_MENU = "Herramientas de administración"
+PRICE_UPDATED = "Precio actualizado: {period} - {amount}"
+CURRENT_PRICE = "Precio actual: {period} - {amount}"
+STATS_OVERVIEW = (
+    "Suscriptores activos: {active}\nRenovaciones: {renewals}\nIngresos estimados: {revenue}"
+)
+BROADCAST_INSTRUCTIONS = "Envía /broadcast <texto> para enviar un mensaje a todos los suscriptores"
+ACCESS_LINK = "Enlace de acceso: {link}"
+SUBSCRIBER_INFO = (
+    "Usuario {user_id}\nInicio: {start}\nExpira: {end}\nTotal: {days} días\nRenovaciones: {renewals}"
+)
+USER_REMOVED = "Usuario {user_id} eliminado"
