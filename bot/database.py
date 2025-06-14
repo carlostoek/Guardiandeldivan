@@ -299,6 +299,29 @@ def get_all_user_subscriptions() -> list[dict]:
     return result
 
 
+def get_user_subscription(user_id: int) -> Optional[dict]:
+    """Retrieve a user subscription if it exists."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "SELECT user_id, username, full_name, join_date, expiration_date, reminded, expired_notified FROM user_subscriptions WHERE user_id=?",
+        (user_id,),
+    )
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {
+            "user_id": row[0],
+            "username": row[1],
+            "full_name": row[2],
+            "join_date": datetime.fromisoformat(row[3]),
+            "expiration_date": datetime.fromisoformat(row[4]),
+            "reminded": row[5],
+            "expired_notified": row[6],
+        }
+    return None
+
+
 def mark_user_reminded(user_id: int):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
