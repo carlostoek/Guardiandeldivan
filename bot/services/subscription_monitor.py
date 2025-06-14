@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta
+import asyncio
+from datetime import datetime
 
-from telegram.ext import ContextTypes, Application
+from aiogram import Bot
 
 from ..database import (
     get_all_user_subscriptions,
@@ -17,7 +18,7 @@ def _build_message(template: str, username: str, expiration_date: datetime) -> s
     )
 
 
-async def _check_subscriptions(context: ContextTypes.DEFAULT_TYPE):
+async def _check_subscriptions(bot: Bot) -> None:
     now = datetime.utcnow()
     reminder_template = load_config(
         "reminder_message",
@@ -31,24 +32,31 @@ async def _check_subscriptions(context: ContextTypes.DEFAULT_TYPE):
         days_left = (sub["expiration_date"] - now).days
         if days_left == 1 and not sub["reminded"]:
             text = _build_message(
-                reminder_template, sub["username"] or sub["full_name"], sub["expiration_date"]
+                reminder_template,
+                sub["username"] or sub["full_name"],
+                sub["expiration_date"],
             )
             try:
-                await context.bot.send_message(sub["user_id"], text)
+                await bot.send_message(sub["user_id"], text)
                 mark_user_reminded(sub["user_id"])
             except Exception:
                 pass
         elif days_left <= 0 and not sub["expired_notified"]:
             text = _build_message(
-                expiration_template, sub["username"] or sub["full_name"], sub["expiration_date"]
+                expiration_template,
+                sub["username"] or sub["full_name"],
+                sub["expiration_date"],
             )
             try:
-                await context.bot.send_message(sub["user_id"], text)
+                await bot.send_message(sub["user_id"], text)
                 mark_user_expired_notified(sub["user_id"])
             except Exception:
                 pass
 
 
-def setup_subscription_monitor(application: Application):
-    application.job_queue.run_repeating(_check_subscriptions, interval=86400, first=0)
+async def subscription_monitor(bot: Bot) -> None:
+    """Background task that checks subscriptions once a day."""
+    while True:
+        await _check_subscriptions(bot)
+        await asyncio.sleep(86400)
 

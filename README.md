@@ -5,6 +5,7 @@ Un bot de Telegram para administrar un canal de pago mediante suscripciones.
 
 - Python 3.8+
 - Dependencias listadas en `requirements.txt`
+- Usa [aiogram](https://docs.aiogram.dev/) 3.x como framework
 
 Instala las dependencias con:
 

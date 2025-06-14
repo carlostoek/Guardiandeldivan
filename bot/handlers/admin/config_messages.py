@@ -1,6 +1,7 @@
 import os
-from telegram import Update
-from telegram.ext import ContextTypes
+
+from aiogram import Router, types
+from aiogram.filters import Command, CommandObject
 
 from ...utils.config import save_config
 
@@ -11,32 +12,31 @@ def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
 
-def admin_only(func):
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not is_admin(update.effective_user.id):
-            await update.effective_message.reply_text("⛔ Acceso denegado")
-            return
-        return await func(update, context)
-
-    return wrapper
+router = Router()
 
 
-@admin_only
-async def set_reminder_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.effective_message.reply_text("Uso: /set_reminder <mensaje>")
+@router.message(Command("set_reminder"))
+async def set_reminder_message(message: types.Message, command: CommandObject) -> None:
+    """Store custom reminder text."""
+    if not is_admin(message.from_user.id):
+        await message.answer("⛔ Acceso denegado")
         return
-    text = " ".join(context.args)
-    save_config("reminder_message", text)
-    await update.effective_message.reply_text("Mensaje de recordatorio guardado")
-
-
-@admin_only
-async def set_expiration_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.effective_message.reply_text("Uso: /set_expiration <mensaje>")
+    if not command.args:
+        await message.answer("Uso: /set_reminder <mensaje>")
         return
-    text = " ".join(context.args)
-    save_config("expiration_message", text)
-    await update.effective_message.reply_text("Mensaje de expiración guardado")
+    save_config("reminder_message", command.args)
+    await message.answer("Mensaje de recordatorio guardado")
+
+
+@router.message(Command("set_expiration"))
+async def set_expiration_message(message: types.Message, command: CommandObject) -> None:
+    """Store custom expiration text."""
+    if not is_admin(message.from_user.id):
+        await message.answer("⛔ Acceso denegado")
+        return
+    if not command.args:
+        await message.answer("Uso: /set_expiration <mensaje>")
+        return
+    save_config("expiration_message", command.args)
+    await message.answer("Mensaje de expiración guardado")
 
