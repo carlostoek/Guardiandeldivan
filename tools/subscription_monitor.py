@@ -3,7 +3,7 @@ import datetime
 
 from aiogram.exceptions import TelegramAPIError
 
-from bot import bot
+from bot import bot, messages
 from database import get_db
 from services.subscription_service import remove_subscription
 from services.config_service import get_config
@@ -14,8 +14,10 @@ async def _check_subscriptions() -> None:
     db = get_db()
     now = datetime.datetime.utcnow()
     tomorrow = now + datetime.timedelta(days=1)
-    reminder_msg = await get_config("reminder_msg") or "Tu suscripción expirará mañana."
-    expiration_msg = await get_config("expiration_msg") or "Tu suscripción ha expirado."
+    reminder_msg = await get_config("reminder_msg") or messages.DEFAULT_REMINDER_MSG
+    expiration_msg = (
+        await get_config("expiration_msg") or messages.DEFAULT_EXPIRATION_MSG
+    )
     async with db.execute("SELECT user_id, end_date FROM subscription") as cursor:
         rows = await cursor.fetchall()
 

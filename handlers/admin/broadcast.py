@@ -4,7 +4,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from bot import bot
+from bot import bot, messages
 from database import get_db
 from services.subscription_service import list_active_subscriptions
 
@@ -22,12 +22,12 @@ async def cmd_broadcast(message: Message, command: Command.CommandObject) -> Non
     async with db.execute("SELECT is_admin FROM user WHERE id=?", (tg_user.id,)) as cur:
         row = await cur.fetchone()
     if not (row and row["is_admin"] == 1):
-        await message.answer("No tienes permiso para usar este comando")
+        await message.answer(messages.ADMIN_ONLY)
         return
 
     text = command.args.strip() if command.args else None
     if not text:
-        await message.answer("Uso: /broadcast &lt;texto&gt;")
+        await message.answer(messages.BROADCAST_USAGE)
         return
 
     subs = await list_active_subscriptions()
@@ -40,4 +40,4 @@ async def cmd_broadcast(message: Message, command: Command.CommandObject) -> Non
             # Ignore delivery errors (user blocked bot, etc.)
             pass
 
-    await message.answer(f"Mensaje enviado a {sent} usuarios")
+    await message.answer(messages.BROADCAST_SENT.format(count=sent))
