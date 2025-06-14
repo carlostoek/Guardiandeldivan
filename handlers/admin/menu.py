@@ -3,11 +3,15 @@ from __future__ import annotations
 from aiogram import Router
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 
-from services.config_service import get_pricing
+import datetime
+from zoneinfo import ZoneInfo
+
+from services.config_service import get_pricing, get_config
 from services.subscription_service import list_active_subscriptions, remove_subscription
 from services.token_service import generate_token
 from bot import messages
 from config import settings
+from database import get_db
 
 router = Router()
 __all__ = ["ADMIN_MENU_KB", "router"]
@@ -28,7 +32,7 @@ SETTINGS_MENU_KB = InlineKeyboardMarkup(
 
 ADMINISTRATION_MENU_KB = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text="Estadísticas", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="\U0001F4C8 Statistics", callback_data="admin_stats")],
         [InlineKeyboardButton(text="Broadcast", callback_data="admin_broadcast")],
         [InlineKeyboardButton(text="Generar enlace", callback_data="admin_gen_link")],
         [InlineKeyboardButton(text="Suscriptores", callback_data="admin_list_subs")],
@@ -61,12 +65,66 @@ async def cb_back(callback: CallbackQuery) -> None:
 
 @router.callback_query(lambda c: c.data == "admin_stats")
 async def cb_stats(callback: CallbackQuery) -> None:
+    db = get_db()
+    now_iso = datetime.datetime.utcnow().isoformat()
+
+    async with db.execute("SELECT COUNT(*) FROM user") as cur:
+        row = await cur.fetchone()
+    total_users = int(row[0]) if row else 0
+
     subs = await list_active_subscriptions()
     active = len(subs)
+
+    async with db.execute(
+        "SELECT COUNT(*) FROM subscription WHERE end_date<=?", (now_iso,)
+    ) as cur:
+        row = await cur.fetchone()
+    expired = int(row[0]) if row else 0
+
+    async with db.execute("SELECT COUNT(*) FROM token WHERE used=1") as cur:
+        row = await cur.fetchone()
+    renewals = int(row[0]) if row else 0
+
+    async with db.execute(
+        "SELECT duration_days, COUNT(*) c FROM token WHERE used=1 GROUP BY duration_days ORDER BY c DESC LIMIT 1"
+    ) as cur:
+        row = await cur.fetchone()
+    if row:
+        days = int(row[0])
+        if days >= 365 * 5:
+            period = "permanent"
+        elif days % 30 == 0:
+            m = days // 30
+            period = f"{m} month{'s' if m != 1 else ''}"
+        else:
+            period = f"{days} day{'s' if days != 1 else ''}"
+    else:
+        period = "N/A"
+
     pricing = await get_pricing()
     amount = float(pricing[1]) if pricing else 0
     revenue = active * amount
-    text = messages.STATS_OVERVIEW.format(active=active, renewals=0, revenue=revenue)
+
+    currency = await get_config("currency") or "USD"
+    tz_name = await get_config("timezone") or "UTC"
+    try:
+        local_time = datetime.datetime.now(ZoneInfo(tz_name)).strftime("%I:%M %p")
+    except Exception:
+        local_time = datetime.datetime.utcnow().strftime("%I:%M %p")
+        tz_name = "UTC"
+
+    text = messages.BOLD_STATS.format(
+        total=total_users,
+        active=active,
+        expired=expired,
+        renewals=renewals,
+        period=period,
+        revenue=f"{revenue:,.0f}",
+        currency=currency,
+        time=local_time,
+        tz=tz_name,
+    )
+
     await callback.message.answer(text)
     await callback.answer()
 

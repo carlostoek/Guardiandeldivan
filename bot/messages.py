@@ -43,6 +43,17 @@ CURRENT_PRICE = "Precio actual: {period} - {amount}"
 STATS_OVERVIEW = (
     "Suscriptores activos: {active}\nRenovaciones: {renewals}\nIngresos estimados: {revenue}"
 )
+BOLD_STATS = (
+    "\ud83d\udcca <b>Subscription Statistics</b>\n"
+    "\ud83d\udc65 Total users: {total}\n"
+    "\u2705 Active: {active}\n"
+    "\u274c Expired: {expired}\n"
+    "\ud83d\udd01 Renewals: {renewals}\n"
+    "\ud83d\udcc5 Most popular period: {period}\n"
+    "\ud83d\udcb0 Estimated revenue: {revenue} {currency}\n"
+    "\ud83d\udd54 Local time: {time} ({tz})\n"
+    "\ud83d\udcb1 Currency: {currency}"
+)
 BROADCAST_INSTRUCTIONS = "Envía /broadcast <texto> para enviar un mensaje a todos los suscriptores"
 ACCESS_LINK = "Enlace de acceso: {link}"
 SUBSCRIBER_INFO = (
