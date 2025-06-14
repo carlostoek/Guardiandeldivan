@@ -7,7 +7,9 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
     ContextTypes,
+    filters,
 )
 from .messages import MESSAGES as MSG
 
@@ -59,8 +61,10 @@ async def gen_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     key = context.args[0]
     token, days = create_token(key)
+    bot_username = (await context.bot.get_me()).username
+    link = f"https://t.me/{bot_username}?start={token}"
     await update.effective_message.reply_text(
-        MSG["gen_token_result"].format(token=token, days=days)
+        MSG["gen_token_result"].format(link=link, days=days)
     )
 
 
@@ -200,6 +204,45 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.effective_message.reply_html(MSG["help"])
 
 
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.pop("awaiting_broadcast", False):
+        message = update.effective_message.text
+        sent = 0
+        for sub in list_active_subscriptions():
+            try:
+                await context.bot.send_message(sub["user_id"], message)
+                sent += 1
+            except Exception as exc:
+                logger.error("Error enviando a %s: %s", sub["user_id"], exc)
+        keyboard = [[InlineKeyboardButton("Volver", callback_data="administracion")]]
+        await update.effective_message.reply_text(
+            MSG["broadcast_sent"].format(sent=sent),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    elif context.user_data.pop("awaiting_rate", False):
+        parts = update.effective_message.text.split()
+        keyboard = [[InlineKeyboardButton("Volver", callback_data="configuracion")]]
+        if len(parts) != 2:
+            await update.effective_message.reply_text(
+                MSG["set_rate_invalid"], reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+        try:
+            days = int(parts[0])
+            amount = float(parts[1])
+        except ValueError:
+            await update.effective_message.reply_text(
+                MSG["set_rate_invalid"], reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+        set_setting("rate_frequency", str(days))
+        set_setting("rate_amount", str(amount))
+        await update.effective_message.reply_text(
+            MSG["set_rate_saved"].format(days=days, amount=amount),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str = MSG["menu_prompt"]):
     """Mostrar el menu principal adecuando opciones según el rol del usuario."""
     if is_admin(update.effective_user.id):
@@ -248,12 +291,15 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             MSG["config_menu"], reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data == "set_tarifa":
-        await query.answer(MSG["set_rate_usage"])
+        context.user_data["awaiting_rate"] = True
+        keyboard = [[InlineKeyboardButton("Cancelar", callback_data="configuracion")]]
+        await query.edit_message_text(
+            MSG["set_rate_prompt"], reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     elif data == "administracion":
         keyboard = [
             [InlineKeyboardButton("Estadísticas", callback_data="admin_stats")],
             [InlineKeyboardButton("Enviar broadcast", callback_data="admin_broadcast")],
-            [InlineKeyboardButton("Generar link", callback_data="admin_gen_link")],
             [InlineKeyboardButton("Generar token", callback_data="admin_gen_token")],
             [InlineKeyboardButton("Suscriptores", callback_data="admin_subs")],
             [InlineKeyboardButton("Volver", callback_data="volver")],
@@ -264,9 +310,11 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "admin_stats":
         await stats(update, context)
     elif data == "admin_broadcast":
-        await query.answer(MSG["broadcast_usage"])
-    elif data == "admin_gen_link":
-        await query.answer(MSG["gen_link_usage"])
+        context.user_data["awaiting_broadcast"] = True
+        keyboard = [[InlineKeyboardButton("Cancelar", callback_data="administracion")]]
+        await query.edit_message_text(
+            MSG["broadcast_prompt"], reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     elif data == "admin_gen_token":
         keyboard = [
             [
@@ -328,8 +376,12 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("token_"):
         key = data.split("_")[1]
         token, days = create_token(key)
+        bot_username = (await context.bot.get_me()).username
+        link = f"https://t.me/{bot_username}?start={token}"
+        keyboard = [[InlineKeyboardButton("Volver", callback_data="administracion")]]
         await query.edit_message_text(
-            MSG["token_generated"].format(token=token, days=days)
+            MSG["token_generated"].format(link=link, days=days),
+            reply_markup=InlineKeyboardMarkup(keyboard),
         )
     elif data == "volver":
         await show_main_menu(update, context)
@@ -371,7 +423,15 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reactions=reactions,
     )
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="HTML")
+        callback = (
+            "administracion" if is_admin(update.effective_user.id) else "volver"
+        )
+        keyboard = [[InlineKeyboardButton("Volver", callback_data=callback)]]
+        await update.callback_query.edit_message_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
     else:
         await update.effective_message.reply_html(text)
 
@@ -398,6 +458,7 @@ def main() -> None:
     application.add_handler(CommandHandler("admin", admin_help))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("menu", menu))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(menu_button))
 
     application.job_queue.run_repeating(check_expirations, interval=3600, first=0)
