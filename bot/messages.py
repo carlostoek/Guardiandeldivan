@@ -25,6 +25,7 @@ SUB_ACTIVATED_WITH_LINK = (
 )
 ADMIN_MENU = "Menú de administración"
 SUBSCRIBER_MENU = "Menú de suscriptor"
+SUBSCRIPTION_MENU = "Menú de suscripción"
 NOT_REGISTERED = (
     "No estás registrado. Solicita un token y envía /start &lt;token&gt; para suscribirte."
 )

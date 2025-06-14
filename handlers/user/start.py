@@ -6,7 +6,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from handlers.user.menu import USER_MENU_KB
+from handlers.user.menu import USER_MENU_KB, SUBSCRIPTION_MENU_KB
 from handlers.admin.menu import ADMIN_MENU_KB
 
 from database import get_db
@@ -62,4 +62,7 @@ async def cmd_start(message: Message, command: Command.CommandObject) -> None:
     elif active:
         await message.answer(messages.SUBSCRIBER_MENU, reply_markup=USER_MENU_KB)
     else:
-        await message.answer(messages.NOT_REGISTERED, reply_markup=USER_MENU_KB)
+        await message.answer(
+            messages.SUBSCRIPTION_MENU,
+            reply_markup=SUBSCRIPTION_MENU_KB,
+        )
