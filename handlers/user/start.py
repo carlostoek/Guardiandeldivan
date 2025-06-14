@@ -6,6 +6,9 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from handlers.user.menu import USER_MENU_KB
+from handlers.admin.menu import ADMIN_MENU_KB
+
 from database import get_db
 from services.subscription_service import add_subscription, get_subscription
 from services.token_service import validate_token, mark_token_as_used
@@ -55,8 +58,8 @@ async def cmd_start(message: Message, command: Command.CommandObject) -> None:
     active = sub and sub.end_date > datetime.datetime.utcnow()
 
     if is_admin:
-        await message.answer(messages.ADMIN_MENU)
+        await message.answer(messages.ADMIN_MENU, reply_markup=ADMIN_MENU_KB)
     elif active:
-        await message.answer(messages.SUBSCRIBER_MENU)
+        await message.answer(messages.SUBSCRIBER_MENU, reply_markup=USER_MENU_KB)
     else:
-        await message.answer(messages.NOT_REGISTERED)
+        await message.answer(messages.NOT_REGISTERED, reply_markup=USER_MENU_KB)
