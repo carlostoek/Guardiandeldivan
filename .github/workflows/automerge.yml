@@ -1,4 +1,4 @@
-name: Automerge PR from Codex
+name: Automerge PR de Carlos
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   automerge:
-    if: github.actor == 'github-codex[bot]'
+    if: github.actor == 'carlostoek'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v6
@@ -25,7 +25,7 @@ jobs:
                 pull_number: pr.number,
                 merge_method: "squash"
               });
-              console.log("PR merged automáticamente 🎉");
+              console.log("✅ PR fusionado automáticamente 🎉");
             } else {
-              console.log("PR no mergeable todavía ⏳");
+              console.log("⚠️ PR no mergeable por ahora ⏳");
             }
