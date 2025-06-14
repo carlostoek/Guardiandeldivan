@@ -9,13 +9,13 @@ ADMIN_ONLY = "No tienes permiso para usar este comando"
 INVALID_TOKEN = "Token inválido"
 
 # Usage strings
-GEN_TOKEN_USAGE = "Uso: /gen_token <días>"
-TOKEN_USAGE = "Uso: /join <token>"
-BROADCAST_USAGE = "Uso: /broadcast <texto>"
-ADD_SUB_USAGE = "Uso: /add_sub <@user> <días>"
-REMOVE_SUB_USAGE = "Uso: /remove_sub <@user>"
-SET_REMINDER_USAGE = "Uso: /set_reminder <texto>"
-SET_EXPIRATION_USAGE = "Uso: /set_expiration <texto>"
+GEN_TOKEN_USAGE = "Uso: /gen_token &lt;días&gt;"
+TOKEN_USAGE = "Uso: /join &lt;token&gt;"
+BROADCAST_USAGE = "Uso: /broadcast &lt;texto&gt;"
+ADD_SUB_USAGE = "Uso: /add_sub &lt;@user&gt; &lt;días&gt;"
+REMOVE_SUB_USAGE = "Uso: /remove_sub &lt;@user&gt;"
+SET_REMINDER_USAGE = "Uso: /set_reminder &lt;texto&gt;"
+SET_EXPIRATION_USAGE = "Uso: /set_expiration &lt;texto&gt;"
 
 # Success / info messages
 TOKEN_GENERATED = "Token generado: <code>{token}</code>"
@@ -26,7 +26,7 @@ SUB_ACTIVATED_WITH_LINK = (
 ADMIN_MENU = "Menú de administración"
 SUBSCRIBER_MENU = "Menú de suscriptor"
 NOT_REGISTERED = (
-    "No estás registrado. Solicita un token y envía /start <token> para suscribirte."
+    "No estás registrado. Solicita un token y envía /start &lt;token&gt; para suscribirte."
 )
 BROADCAST_SENT = "Mensaje enviado a {count} usuarios"
 USER_NOT_FOUND = "Usuario no encontrado"
