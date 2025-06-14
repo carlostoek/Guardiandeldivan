@@ -27,11 +27,11 @@ async def cmd_set_price(message: Message, command: Command.CommandObject) -> Non
         await message.answer(messages.ADMIN_ONLY)
         return
     if not command.args:
-        await message.answer("Uso: /set_price <periodo> <cantidad>")
+        await message.answer(messages.SET_PRICE_USAGE)
         return
     parts = command.args.split()
     if len(parts) != 2:
-        await message.answer("Uso: /set_price <periodo> <cantidad>")
+        await message.answer(messages.SET_PRICE_USAGE)
         return
     period = parts[0]
     amount = parts[1]

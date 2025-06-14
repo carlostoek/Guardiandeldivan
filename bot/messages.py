@@ -16,6 +16,7 @@ ADD_SUB_USAGE = "Uso: /add_sub &lt;@user&gt; &lt;días&gt;"
 REMOVE_SUB_USAGE = "Uso: /remove_sub &lt;@user&gt;"
 SET_REMINDER_USAGE = "Uso: /set_reminder &lt;texto&gt;"
 SET_EXPIRATION_USAGE = "Uso: /set_expiration &lt;texto&gt;"
+SET_PRICE_USAGE = "Uso: /set_price &lt;periodo&gt; &lt;cantidad&gt;"
 
 # Success / info messages
 TOKEN_GENERATED = "Token generado: <code>{token}</code>"
@@ -54,7 +55,9 @@ BOLD_STATS = (
     "\ud83d\udd54 Local time: {time} ({tz})\n"
     "\ud83d\udcb1 Currency: {currency}"
 )
-BROADCAST_INSTRUCTIONS = "Envía /broadcast <texto> para enviar un mensaje a todos los suscriptores"
+BROADCAST_INSTRUCTIONS = (
+    "Envía /broadcast &lt;texto&gt; para enviar un mensaje a todos los suscriptores"
+)
 ACCESS_LINK = "Enlace de acceso: {link}"
 SUBSCRIBER_INFO = (
     "Usuario {user_id}\nInicio: {start}\nExpira: {end}\nTotal: {days} días\nRenovaciones: {renewals}"
