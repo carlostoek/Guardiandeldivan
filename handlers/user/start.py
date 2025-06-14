@@ -57,5 +57,5 @@ async def cmd_start(message: Message, command: Command.CommandObject) -> None:
         await message.answer("Menú de suscriptor")
     else:
         await message.answer(
-            "No estás registrado. Solicita un token y envía /start <token> para suscribirte."
+            "No estás registrado. Solicita un token y envía /start &lt;token&gt; para suscribirte."
         )
