@@ -20,6 +20,7 @@ from .database import (
     remove_subscription,
     subscription_expired,
     list_active_subscriptions,
+    list_tokens,
     set_setting,
     get_setting,
     get_all_subscriptions,
@@ -125,6 +126,39 @@ async def list_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = [
         f"{s['user_id']} - {s['start_date'].strftime('%Y-%m-%d')}" for s in subs
     ]
+    await update.effective_message.reply_text("\n".join(lines))
+
+
+@admin_only
+async def list_tokens_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mostrar tokens generados con filtros opcionales."""
+    user_id = None
+    start_date = None
+    end_date = None
+    for arg in context.args:
+        if arg.isdigit():
+            user_id = int(arg)
+        else:
+            try:
+                dt = datetime.fromisoformat(arg)
+            except ValueError:
+                await update.effective_message.reply_text(MSG["list_tokens_usage"])
+                return
+            if not start_date:
+                start_date = dt
+            else:
+                end_date = dt
+    tokens = list_tokens(user_id=user_id, start_date=start_date, end_date=end_date)
+    if not tokens:
+        await update.effective_message.reply_text(MSG["list_tokens_none"])
+        return
+    lines = []
+    for t in tokens:
+        used = "✅" if t["used"] else "❌"
+        user = f" ({t['user_id']})" if t["user_id"] else ""
+        lines.append(
+            f"{t['created_at'].strftime('%Y-%m-%d')} - {t['token']} - {t['duration']}d - {used}{user}"
+        )
     await update.effective_message.reply_text("\n".join(lines))
 
 
@@ -300,6 +334,7 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("Estadísticas", callback_data="admin_stats")],
             [InlineKeyboardButton("Enviar broadcast", callback_data="admin_broadcast")],
+            [InlineKeyboardButton("Tokens", callback_data="admin_tokens")],
             [InlineKeyboardButton("Generar token", callback_data="admin_gen_token")],
             [InlineKeyboardButton("Suscriptores", callback_data="admin_subs")],
             [InlineKeyboardButton("Volver", callback_data="volver")],
@@ -315,6 +350,22 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             MSG["broadcast_prompt"], reply_markup=InlineKeyboardMarkup(keyboard)
         )
+    elif data == "admin_tokens":
+        tokens = list_tokens()
+        if not tokens:
+            await query.edit_message_text(MSG["list_tokens_none"])
+        else:
+            lines = []
+            for t in tokens:
+                used = "✅" if t["used"] else "❌"
+                user = f" ({t['user_id']})" if t["user_id"] else ""
+                lines.append(
+                    f"{t['created_at'].strftime('%Y-%m-%d')} - {t['token']} - {t['duration']}d - {used}{user}"
+                )
+            keyboard = [[InlineKeyboardButton("Volver", callback_data="administracion")]]
+            await query.edit_message_text(
+                "\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard)
+            )
     elif data == "admin_gen_token":
         keyboard = [
             [
@@ -452,6 +503,7 @@ def main() -> None:
     application.add_handler(CommandHandler("add_sub", add_sub))
     application.add_handler(CommandHandler("remove_sub", remove_sub))
     application.add_handler(CommandHandler("list_subs", list_subs))
+    application.add_handler(CommandHandler("list_tokens", list_tokens_cmd))
     application.add_handler(CommandHandler("set_rate", set_rate))
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CommandHandler("gen_link", gen_link))

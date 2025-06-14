@@ -48,6 +48,7 @@ python -m bot.main
 - `/set_rate <dias> <monto>` define la tarifa y periodo de cobro.
 - `/broadcast <mensaje>` envía un mensaje a todos los suscriptores.
 - `/gen_link <user_id> <duracion>` genera un enlace con token para un usuario.
+- `/list_tokens [user_id] [desde] [hasta]` muestra los tokens generados con filtros opcionales.
 
 ### Comandos de usuario
 

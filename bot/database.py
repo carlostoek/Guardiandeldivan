@@ -179,3 +179,46 @@ def use_token(token: str) -> Optional[int]:
     conn.close()
     return duration
 
+
+def list_tokens(
+    user_id: Optional[int] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+) -> list[dict]:
+    """Return tokens with optional filtering by user and date range."""
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    query = (
+        "SELECT t.token, t.duration, t.used, t.created_at, s.user_id "
+        "FROM tokens t LEFT JOIN subscriptions s ON t.token = s.token"
+    )
+    conditions = []
+    params = []
+    if start_date:
+        conditions.append("t.created_at >= ?")
+        params.append(start_date.isoformat())
+    if end_date:
+        conditions.append("t.created_at <= ?")
+        params.append(end_date.isoformat())
+    if user_id is not None:
+        conditions.append("s.user_id = ?")
+        params.append(user_id)
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " ORDER BY t.created_at DESC"
+    c.execute(query, params)
+    rows = c.fetchall()
+    conn.close()
+    result = []
+    for row in rows:
+        result.append(
+            {
+                "token": row[0],
+                "duration": row[1],
+                "used": bool(row[2]),
+                "created_at": datetime.fromisoformat(row[3]),
+                "user_id": row[4],
+            }
+        )
+    return result
+

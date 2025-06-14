@@ -20,6 +20,8 @@ MESSAGES = {
     "broadcast_usage": "📝 Uso: /broadcast <mensaje>",
     "broadcast_sent": "✅ Mensaje enviado a {sent} usuarios",
     "broadcast_prompt": "📝 Envía el mensaje a todos los suscriptores:",
+    "list_tokens_usage": "📝 Uso: /list_tokens [user_id] [desde] [hasta]",
+    "list_tokens_none": "ℹ️ No se encontraron tokens",
     "gen_link_usage": "📝 Uso: /gen_link <user_id> <duracion>",
     "gen_link_user_id_numeric": "⚠️ user_id debe ser numérico",
     "gen_link_result": "🔗 Enlace de acceso: {link}",
