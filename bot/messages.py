@@ -49,3 +49,6 @@ SUBSCRIBER_INFO = (
     "Usuario {user_id}\nInicio: {start}\nExpira: {end}\nTotal: {days} días\nRenovaciones: {renewals}"
 )
 USER_REMOVED = "Usuario {user_id} eliminado"
+PRICE_SELECT_PERIOD = "Selecciona el período de suscripción"
+PRICE_ENTER_AMOUNT = "Ingresa el precio para este período (solo números, p. ej. 10):"
+

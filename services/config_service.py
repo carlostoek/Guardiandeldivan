@@ -7,6 +7,8 @@ __all__ = [
     "set_config",
     "get_pricing",
     "set_pricing",
+    "get_price",
+    "set_price",
 ]
 
 
@@ -41,3 +43,14 @@ async def get_pricing() -> Optional[tuple[str, str]]:
 async def set_pricing(period: str, amount: str) -> None:
     await set_config("price_period", period)
     await set_config("price_amount", amount)
+
+
+async def set_price(period: str, amount: str) -> None:
+    """Store price for a specific subscription period."""
+    await set_config(f"price_{period}", amount)
+
+
+async def get_price(period: str) -> Optional[str]:
+    """Return the price for the given subscription period if set."""
+    return await get_config(f"price_{period}")
+
