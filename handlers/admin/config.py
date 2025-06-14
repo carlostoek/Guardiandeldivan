@@ -6,6 +6,7 @@ from aiogram.types import Message
 
 from database import get_db
 from services.config_service import set_config
+from bot import messages
 
 router = Router()
 
@@ -24,16 +25,16 @@ async def cmd_set_reminder(message: Message, command: Command.CommandObject) -> 
     if tg_user is None:
         return
     if not await _ensure_admin(tg_user.id):
-        await message.answer("No tienes permiso para usar este comando")
+        await message.answer(messages.ADMIN_ONLY)
         return
 
     text = command.args.strip() if command.args else None
     if not text:
-        await message.answer("Uso: /set_reminder <texto>")
+        await message.answer(messages.SET_REMINDER_USAGE)
         return
 
     await set_config("reminder_msg", text)
-    await message.answer("Mensaje de recordatorio actualizado")
+    await message.answer(messages.REMINDER_UPDATED)
 
 
 @router.message(Command("set_expiration"))
@@ -42,13 +43,13 @@ async def cmd_set_expiration(message: Message, command: Command.CommandObject) -
     if tg_user is None:
         return
     if not await _ensure_admin(tg_user.id):
-        await message.answer("No tienes permiso para usar este comando")
+        await message.answer(messages.ADMIN_ONLY)
         return
 
     text = command.args.strip() if command.args else None
     if not text:
-        await message.answer("Uso: /set_expiration <texto>")
+        await message.answer(messages.SET_EXPIRATION_USAGE)
         return
 
     await set_config("expiration_msg", text)
-    await message.answer("Mensaje de expiración actualizado")
+    await message.answer(messages.EXPIRATION_UPDATED)

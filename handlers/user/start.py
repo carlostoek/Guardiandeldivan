@@ -9,6 +9,7 @@ from aiogram.types import Message
 from database import get_db
 from services.subscription_service import add_subscription, get_subscription
 from services.token_service import validate_token, mark_token_as_used
+from bot import messages
 
 router = Router()
 
@@ -34,12 +35,14 @@ async def cmd_start(message: Message, command: Command.CommandObject) -> None:
     if token:
         duration = await validate_token(token)
         if duration is None:
-            await message.answer("Token inválido")
+            await message.answer(messages.INVALID_TOKEN)
             return
         await mark_token_as_used(token)
         await add_subscription(tg_user.id, duration)
         await message.answer(
-            f"Suscripción activada por {duration} días.\nInvitación: {FAKE_INVITE_LINK}"
+            messages.SUB_ACTIVATED_WITH_LINK.format(
+                duration=duration, invite=FAKE_INVITE_LINK
+            )
         )
         return
 
@@ -52,10 +55,8 @@ async def cmd_start(message: Message, command: Command.CommandObject) -> None:
     active = sub and sub.end_date > datetime.datetime.utcnow()
 
     if is_admin:
-        await message.answer("Menú de administración")
+        await message.answer(messages.ADMIN_MENU)
     elif active:
-        await message.answer("Menú de suscriptor")
+        await message.answer(messages.SUBSCRIBER_MENU)
     else:
-        await message.answer(
-            "No estás registrado. Solicita un token y envía /start &lt;token&gt; para suscribirte."
-        )
+        await message.answer(messages.NOT_REGISTERED)
