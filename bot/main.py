@@ -23,6 +23,7 @@ from .database import (
     set_setting,
     get_setting,
     get_all_subscriptions,
+    mark_reminder_sent,
 )
 from .token_manager import generate_token, create_token
 from .database import use_token
@@ -153,7 +154,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     message = " ".join(context.args)
     sent = 0
-    for sub in list_active_subscriptions():
+    for sub in get_all_subscriptions():
         try:
             await context.bot.send_message(sub["user_id"], message)
             sent += 1
@@ -241,6 +242,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             MSG["set_rate_saved"].format(days=days, amount=amount),
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
+    elif context.user_data.pop("awaiting_reminder", False):
+        set_setting("reminder_message", update.effective_message.text)
+        keyboard = [[InlineKeyboardButton("Volver", callback_data="configuracion")]]
+        await update.effective_message.reply_text(
+            MSG["reminder_saved"], reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif context.user_data.pop("awaiting_expired", False):
+        set_setting("expiration_message", update.effective_message.text)
+        keyboard = [[InlineKeyboardButton("Volver", callback_data="configuracion")]]
+        await update.effective_message.reply_text(
+            MSG["expired_saved"], reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str = MSG["menu_prompt"]):
@@ -285,6 +298,8 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "configuracion":
         keyboard = [
             [InlineKeyboardButton("Configurar tarifa", callback_data="set_tarifa")],
+            [InlineKeyboardButton("Mensaje recordatorio", callback_data="set_recordatorio")],
+            [InlineKeyboardButton("Mensaje expiración", callback_data="set_expiracion")],
             [InlineKeyboardButton("Volver", callback_data="volver")],
         ]
         await query.edit_message_text(
@@ -295,6 +310,18 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("Cancelar", callback_data="configuracion")]]
         await query.edit_message_text(
             MSG["set_rate_prompt"], reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif data == "set_recordatorio":
+        context.user_data["awaiting_reminder"] = True
+        keyboard = [[InlineKeyboardButton("Cancelar", callback_data="configuracion")]]
+        await query.edit_message_text(
+            MSG["set_reminder_prompt"], reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif data == "set_expiracion":
+        context.user_data["awaiting_expired"] = True
+        keyboard = [[InlineKeyboardButton("Cancelar", callback_data="configuracion")]]
+        await query.edit_message_text(
+            MSG["set_expired_prompt"], reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data == "administracion":
         keyboard = [
@@ -396,9 +423,24 @@ async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def check_expirations(context: ContextTypes.DEFAULT_TYPE):
-    for sub in list_active_subscriptions():
-        if subscription_expired(sub):
-            user_id = sub["user_id"]
+    reminder_text = get_setting("reminder_message", "Tu suscripción termina mañana")
+    expired_text = get_setting("expiration_message", "Tu suscripción ha expirado")
+    now = datetime.utcnow()
+    for sub in get_all_subscriptions():
+        end_date = sub["start_date"] + timedelta(days=sub["duration"])
+        remaining = end_date - now
+        user_id = sub["user_id"]
+        if remaining <= timedelta(days=1) and remaining > timedelta(0) and not sub.get("reminder_sent"):
+            try:
+                await context.bot.send_message(user_id, reminder_text)
+            except Exception as exc:
+                logger.error("No se pudo enviar recordatorio a %s: %s", user_id, exc)
+            mark_reminder_sent(user_id)
+        elif remaining <= timedelta(0):
+            try:
+                await context.bot.send_message(user_id, expired_text)
+            except Exception as exc:
+                logger.error("No se pudo notificar expiración a %s: %s", user_id, exc)
             logger.info("Expulsando %s por expiracion", user_id)
             await context.bot.ban_chat_member(CHANNEL_ID, user_id)
             remove_subscription(user_id)

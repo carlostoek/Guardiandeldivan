@@ -15,10 +15,15 @@ def init_db():
             token TEXT UNIQUE,
             start_date TEXT,
             duration INTEGER,
-            renewals INTEGER DEFAULT 0
+            renewals INTEGER DEFAULT 0,
+            reminder_sent INTEGER DEFAULT 0
         )
         """
     )
+    try:
+        c.execute("ALTER TABLE subscriptions ADD COLUMN reminder_sent INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS settings (
@@ -46,7 +51,7 @@ def add_subscription(user_id: int, token: str, duration: int):
     c = conn.cursor()
     start_date = datetime.utcnow().isoformat()
     c.execute(
-        "INSERT OR REPLACE INTO subscriptions (user_id, token, start_date, duration, renewals) VALUES (?, ?, ?, ?, COALESCE((SELECT renewals FROM subscriptions WHERE user_id=?),0))",
+        "INSERT OR REPLACE INTO subscriptions (user_id, token, start_date, duration, renewals, reminder_sent) VALUES (?, ?, ?, ?, COALESCE((SELECT renewals FROM subscriptions WHERE user_id=?),0), 0)",
         (user_id, token, start_date, duration, user_id),
     )
     conn.commit()
@@ -57,7 +62,7 @@ def get_subscription(user_id: int) -> Optional[dict]:
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute(
-        "SELECT user_id, token, start_date, duration, renewals FROM subscriptions WHERE user_id=?",
+        "SELECT user_id, token, start_date, duration, renewals, reminder_sent FROM subscriptions WHERE user_id=?",
         (user_id,),
     )
     row = c.fetchone()
@@ -69,6 +74,7 @@ def get_subscription(user_id: int) -> Optional[dict]:
             "start_date": datetime.fromisoformat(row[2]),
             "duration": row[3],
             "renewals": row[4],
+            "reminder_sent": row[5],
         }
     return None
 
@@ -93,7 +99,7 @@ def list_active_subscriptions() -> list[dict]:
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute(
-        "SELECT user_id, token, start_date, duration, renewals FROM subscriptions"
+        "SELECT user_id, token, start_date, duration, renewals, reminder_sent FROM subscriptions"
     )
     rows = c.fetchall()
     conn.close()
@@ -105,6 +111,7 @@ def list_active_subscriptions() -> list[dict]:
             "start_date": datetime.fromisoformat(row[2]),
             "duration": row[3],
             "renewals": row[4],
+            "reminder_sent": row[5],
         }
         if not subscription_expired(sub):
             result.append(sub)
@@ -136,7 +143,7 @@ def get_all_subscriptions() -> list[dict]:
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute(
-        "SELECT user_id, token, start_date, duration, renewals FROM subscriptions"
+        "SELECT user_id, token, start_date, duration, renewals, reminder_sent FROM subscriptions"
     )
     rows = c.fetchall()
     conn.close()
@@ -149,9 +156,21 @@ def get_all_subscriptions() -> list[dict]:
                 "start_date": datetime.fromisoformat(row[2]),
                 "duration": row[3],
                 "renewals": row[4],
+                "reminder_sent": row[5],
             }
         )
     return result
+
+
+def mark_reminder_sent(user_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute(
+        "UPDATE subscriptions SET reminder_sent=1 WHERE user_id=?",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
 
 
 def save_token(token: str, duration: int):
