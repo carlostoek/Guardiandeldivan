@@ -9,14 +9,15 @@ Este bot de Telegram gestiona suscripciones y requiere un token para funcionar.
    pip install -r requirements.txt
    ```
 
-2. Copia `.env.example` a `.env` y añade tu `BOT_TOKEN` de Telegram:
+2. Copia `.env.example` a `.env` y define `BOT_TOKEN` y `ADMIN_IDS`:
    ```bash
    cp .env.example .env
    echo "BOT_TOKEN=TU_TOKEN_AQUI" >> .env
+   echo "ADMIN_IDS=123456789" >> .env
    ```
 
 ## Ejecución
 
-Inicia el bot ejecutando `python main.py`. Si `BOT_TOKEN` no está definido se
-mostrará un error indicando cómo configurarlo.
+Inicia el bot ejecutando `python main.py`. Si `BOT_TOKEN` o `ADMIN_IDS` no están
+definidos se mostrará un error indicando cómo configurarlos.
 

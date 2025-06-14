@@ -2,6 +2,8 @@ import asyncio
 
 from bot import bot, dp
 from database import init_db
+from config import settings
+from services.admin_service import ensure_admins
 from tools.subscription_monitor import monitor_subscriptions
 from handlers.user import start_router
 from handlers.admin import (
@@ -14,6 +16,7 @@ from handlers.admin import (
 
 async def main() -> None:
     await init_db()
+    await ensure_admins(settings.ADMIN_IDS)
     asyncio.create_task(monitor_subscriptions())
     dp.include_router(start_router)
     dp.include_router(token_router)
