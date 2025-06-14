@@ -5,6 +5,8 @@ from database import get_db
 __all__ = [
     "get_config",
     "set_config",
+    "get_pricing",
+    "set_pricing",
 ]
 
 
@@ -27,3 +29,15 @@ async def set_config(key: str, value: str) -> None:
         (key, value),
     )
     await db.commit()
+
+async def get_pricing() -> Optional[tuple[str, str]]:
+    period = await get_config("price_period")
+    amount = await get_config("price_amount")
+    if period is None or amount is None:
+        return None
+    return period, amount
+
+
+async def set_pricing(period: str, amount: str) -> None:
+    await set_config("price_period", period)
+    await set_config("price_amount", amount)

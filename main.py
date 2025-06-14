@@ -11,6 +11,8 @@ from handlers.admin import (
     users_router,
     broadcast_router,
     config_router,
+    pricing_router,
+    menu_router,
 )
 
 
@@ -23,6 +25,8 @@ async def main() -> None:
     dp.include_router(users_router)
     dp.include_router(broadcast_router)
     dp.include_router(config_router)
+    dp.include_router(pricing_router)
+    dp.include_router(menu_router)
     await dp.start_polling(bot)
 
 
